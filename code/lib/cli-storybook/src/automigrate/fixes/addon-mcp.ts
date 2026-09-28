@@ -1,4 +1,5 @@
 import { getAddonNames } from 'storybook/internal/common';
+import { readConfig } from 'storybook/internal/csf-tools';
 import { logger } from 'storybook/internal/node-logger';
 import { detectAgent } from 'storybook/internal/telemetry';
 
@@ -29,13 +30,26 @@ export const addonMcp: Fix<AddonMcpOptions> = {
   id: 'addon-mcp',
   link: 'https://github.com/storybookjs/storybook/tree/next/code/addons/mcp',
 
-  async check({ mainConfig }) {
+  async check({ mainConfig, mainConfigPath }) {
     const agent = detectAgent();
     if (!agent) {
       return null;
     }
 
     const isInstalled = getAddonNames(mainConfig).some((addon) => addon.includes(ADDON_MCP));
+
+    // An optional addon: skip a main config that `add` could not edit, such as one that spreads a
+    // shared config or exports a factory call, instead of failing the migration.
+    if (!isInstalled && mainConfigPath) {
+      const main = await readConfig(mainConfigPath);
+      main.appendValueToArray(['addons'], ADDON_MCP);
+      if (main.mutationDiagnostics.length > 0) {
+        logger.debug(
+          `Skipping ${ADDON_MCP} in ${mainConfigPath}: ${main.mutationDiagnostics[0].message}`
+        );
+        return null;
+      }
+    }
 
     return { agentName: agent.name, isInstalled };
   },

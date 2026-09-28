@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { JsPackageManager } from 'storybook/internal/common';
+import { loadConfig, readConfig } from 'storybook/internal/csf-tools';
 import { logger } from 'storybook/internal/node-logger';
 import { detectAgent } from 'storybook/internal/telemetry';
 import type { StorybookConfigRaw } from 'storybook/internal/types';
@@ -11,6 +12,7 @@ import { type AddonMcpOptions, addonMcp } from './addon-mcp.ts';
 
 vi.mock('../../add', { spy: true });
 vi.mock('storybook/internal/common', { spy: true });
+vi.mock('storybook/internal/csf-tools', { spy: true });
 vi.mock('storybook/internal/node-logger', { spy: true });
 vi.mock('storybook/internal/telemetry', { spy: true });
 
@@ -62,6 +64,26 @@ describe('addon-mcp', () => {
           agentName: 'claude',
           isInstalled: false,
         });
+      });
+
+      it('skips a main config that storybook add could not edit', async () => {
+        vi.mocked(readConfig).mockResolvedValue(
+          loadConfig('export default { ...baseConfig, stories: [] };').parse()
+        );
+
+        await expect(
+          addonMcp.check({ ...baseCheckOptions, mainConfigPath: '.storybook/main.ts' })
+        ).resolves.toBeNull();
+      });
+
+      it('offers the addon for a main config that storybook add can edit', async () => {
+        vi.mocked(readConfig).mockResolvedValue(
+          loadConfig("export default { addons: ['@storybook/addon-links'] };").parse()
+        );
+
+        await expect(
+          addonMcp.check({ ...baseCheckOptions, mainConfigPath: '.storybook/main.ts' })
+        ).resolves.toEqual({ agentName: 'claude', isInstalled: false });
       });
 
       it('returns isInstalled: true when addon-mcp is configured as a string', async () => {
