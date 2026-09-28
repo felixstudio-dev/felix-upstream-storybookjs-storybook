@@ -136,7 +136,7 @@ export async function collectAutomigrationsAcrossProjects(
   const allAutomigrations = Array.from(automigrationMap.values());
 
   const applicableAutomigrations = allAutomigrations.filter((am) =>
-    am.reports.every((rep) => rep.status !== 'not_applicable')
+    am.reports.some((rep) => rep.status !== 'not_applicable')
   );
   // Single pass through detectedAutomigrations to build both arrays
   const { successAutomigrations, failedAutomigrations } = applicableAutomigrations.reduce(
@@ -297,7 +297,7 @@ export async function runAutomigrationsForProjects(
   const projectResults: Record<ConfigDir, AutomigrationResult> = {};
 
   const applicableAutomigrations = selectedAutomigrations.filter((am) =>
-    am.reports.every((rep) => rep.status !== 'not_applicable')
+    am.reports.some((rep) => rep.status !== 'not_applicable')
   );
   const projectAutomigrationResults = new Map<
     ConfigDir,

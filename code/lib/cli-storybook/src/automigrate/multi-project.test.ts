@@ -97,6 +97,22 @@ describe('multi-project automigrations', () => {
       expect(results[2].reports.every((report) => report.status === 'not_applicable')).toBe(true);
     });
 
+    it('counts a fix that applies to only some of the projects as detected', async () => {
+      const fix = createMockFix('some-projects');
+      vi.mocked(fix.check!).mockResolvedValueOnce({}).mockResolvedValueOnce(null);
+
+      await collectAutomigrationsAcrossProjects({
+        fixes: [fix],
+        projects: [
+          createMockProject('/project1/.storybook'),
+          createMockProject('/project2/.storybook'),
+        ],
+        taskLog: taskLogMock,
+      });
+
+      expect(taskLogMock.success).toHaveBeenCalledWith('1 automigration(s) detected');
+    });
+
     it('should deduplicate automigrations across projects', async () => {
       const fix1 = createMockFix('fix1', { needsFix: true });
 
