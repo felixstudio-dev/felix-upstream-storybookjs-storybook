@@ -423,6 +423,8 @@ export async function runAutomigrationsForProjects(
         fixResults[fix.id] = FixStatus.FAILED;
         fixFailures[fix.id] = sanitizeError(error as Error);
         taskLog.message(CLI_COLORS.error(`${logger.SYMBOLS.error} ${automigration.fix.id}`));
+        // Shown with the task log when the project fails, e.g. manual steps a fix could not take.
+        taskLog.message(error instanceof Error ? error.message : String(error));
         logger.debug(errorMessage);
         ErrorCollector.addError(error);
       }

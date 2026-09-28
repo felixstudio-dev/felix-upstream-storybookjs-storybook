@@ -4,6 +4,7 @@ import {
   type ProjectAutomigrationData,
   collectAutomigrationsAcrossProjects,
   promptForAutomigrations,
+  runAutomigrationsForProjects,
 } from './multi-project.ts';
 import type { Fix } from './types.ts';
 
@@ -13,6 +14,7 @@ vi.mock('storybook/internal/node-logger', async (importOriginal) => {
     prompt: {
       multiselect: vi.fn(),
       error: vi.fn(),
+      taskLog: vi.fn(() => ({ message: vi.fn(), success: vi.fn(), error: vi.fn() })),
     },
     logger: {
       log: vi.fn(),
@@ -147,6 +149,20 @@ describe('multi-project automigrations', () => {
       expect(results).toHaveLength(2);
       expect(results[0].fix.id).toBe('fix1');
       expect(results[0].reports.every((report) => report.status === 'check_failed')).toBe(true);
+    });
+  });
+
+  describe('runAutomigrationsForProjects', () => {
+    it('shows why a fix failed in the project task log', async () => {
+      const { prompt } = await import('storybook/internal/node-logger');
+      const failing = createMockFix('failing');
+      vi.mocked(failing.run!).mockRejectedValue(new Error('1. Remove setup.ts by hand'));
+      const automigrations = [asAutomigration(failing, createMockProject('/project1/.storybook'))];
+
+      await runAutomigrationsForProjects(automigrations, { automigrations, yes: true });
+
+      const projectLog = vi.mocked(prompt.taskLog).mock.results.at(-1)!.value;
+      expect(projectLog.message).toHaveBeenCalledWith('1. Remove setup.ts by hand');
     });
   });
 
