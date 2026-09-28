@@ -22,16 +22,36 @@ interface Options {
   upgradable: PackageMetadata[];
 }
 
+const scopeOf = (packageName: string) =>
+  packageName.startsWith('@') ? packageName.slice(0, packageName.indexOf('/')) : null;
+
+// A package whose scope has siblings that stay behind, like `@nx/storybook` next to `@nx/web`,
+// keeps its major version: a new major would fall out of step with them.
 async function getLatestVersions(
   packageManager: JsPackageManager,
-  packages: [string, string][]
+  packages: [string, string][],
+  allDependencies: Record<string, string>
 ): Promise<PackageMetadata[]> {
+  const upgrading = new Set(packages.map(([packageName]) => packageName));
+  const scopesStayingBehind = new Set(
+    Object.keys(allDependencies)
+      .filter((dependency) => !upgrading.has(dependency))
+      .map(scopeOf)
+      .filter((scope) => scope !== null && scope !== '@storybook')
+  );
   return Promise.all(
-    packages.map(async ([packageName]) => ({
-      packageName,
-      beforeVersion: await packageManager.getInstalledVersion(packageName),
-      afterVersion: await packageManager.latestVersion(packageName),
-    }))
+    packages.map(async ([packageName]) => {
+      const beforeVersion = await packageManager.getInstalledVersion(packageName);
+      const keepMajor = !!beforeVersion && scopesStayingBehind.has(scopeOf(packageName));
+      return {
+        packageName,
+        beforeVersion,
+        afterVersion: await packageManager.latestVersion(
+          packageName,
+          keepMajor ? `^${beforeVersion}` : undefined
+        ),
+      };
+    })
   );
 }
 
@@ -95,7 +115,11 @@ export const upgradeStorybookRelatedDependencies = {
       )
     ).map((packageName) => [packageName, allDependencies[packageName]]) as [string, string][];
 
-    const packageVersions = await getLatestVersions(packageManager, uniquePackages);
+    const packageVersions = await getLatestVersions(
+      packageManager,
+      uniquePackages,
+      allDependencies
+    );
     const upgradablePackages = packageVersions.filter(
       ({ afterVersion, beforeVersion, packageName }) => {
         if (
